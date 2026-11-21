@@ -1,0 +1,6 @@
+{
+  "name": "Meta Ads AI Controller & Creative Staging",
+  "description": "AI-powered Meta Ads manager with automated diagnostics, creative copywriting studio, and human-in-the-loop approval staging queue.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
