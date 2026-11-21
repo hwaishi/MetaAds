@@ -9,9 +9,9 @@ import {
   Sparkles,
   CheckCircle2,
   Zap,
-  Activity,
   BarChart3,
-  RefreshCw
+  RefreshCw,
+  Info
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -48,7 +48,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
   const fetchData = async () => {
     setLoadingData(true);
     try {
-      const res = await fetch(`/api/insights?account_id=${selectedAccount}&date_preset=last_7d`);
+      const res = await fetch(`/api/insights?account_id=${selectedAccount}&date_preset=last_7d`, {
+        headers: { 'X-Demo-User': 'alex@brand.com', 'X-Demo-Role': 'ADMIN' }
+      });
       const data = await res.json();
       setInsights(data);
     } catch (err) {
@@ -63,7 +65,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
     try {
       const res = await fetch('/api/ai/diagnostics', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Demo-User': 'alex@brand.com',
+          'X-Demo-Role': 'ADMIN'
+        },
         body: JSON.stringify({ account_id: selectedAccount })
       });
       const data = await res.json();
@@ -81,13 +87,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
   }, [selectedAccount]);
 
   const handleStageAiEdit = async (diag: any) => {
+    if (diag.payload?.action === 'ADVISORY' || diag.payload?.action === 'UPDATE_BUDGET') {
+      setActionMessage(`Notice: Recommendation "${diag.title}" is advisory and cannot be staged automatically.`);
+      setTimeout(() => setActionMessage(null), 4000);
+      return;
+    }
+
     try {
+      // Fetch ad sets to get a valid adset_id for this account
+      const asRes = await fetch(`/api/adsets?account_id=${selectedAccount}`);
+      const adSetsList = await asRes.json();
+      const targetAdSetId = diag.payload?.adset_id || (adSetsList.length > 0 ? adSetsList[0].id : 'as_201');
+
       const res = await fetch('/api/creatives/stage-ad', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Demo-User': 'alex@brand.com',
+          'X-Demo-Role': 'ADMIN'
+        },
         body: JSON.stringify({
           ad_account_id: selectedAccount,
-          target_parent_id: diag.payload.adset_id || 'as_201',
+          target_parent_id: targetAdSetId,
           name: `AI Fix: ${diag.title}`,
           format: 'image',
           primary_text: 'Optimized fresh creative variant generated automatically to resolve performance anomaly.',
@@ -111,7 +132,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
       <div className="min-h-[80vh] flex items-center justify-center bg-slate-950 text-white">
         <div className="flex items-center space-x-3">
           <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
-          <span className="text-slate-300 font-medium">Syncing with Meta Marketing API v27.0...</span>
+          <span className="text-slate-300 font-medium">Syncing account metrics...</span>
         </div>
       </div>
     );
@@ -126,12 +147,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
         <div>
           <div className="flex items-center space-x-2">
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Live API Connected (v27.0)
+              Simulation Mode Active
             </span>
-            <span className="text-xs text-slate-400">Last Synced: Just now</span>
+            <span className="text-xs text-slate-400 flex items-center space-x-1">
+              <Info className="w-3.5 h-3.5 text-amber-400" />
+              <span>State resets on restart</span>
+            </span>
           </div>
           <h1 className="text-2xl font-bold text-white mt-1">Campaign Performance & AI Command Center</h1>
-          <p className="text-sm text-slate-400">Real-time metrics, automated fatigue detection, and safe human-in-the-loop staging.</p>
+          <p className="text-sm text-slate-400">{insights.snapshot_label}</p>
         </div>
         <div className="mt-4 md:mt-0 flex items-center space-x-3">
           <button
@@ -170,15 +194,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg">
           <div className="flex items-center justify-between text-slate-400 mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Spend (7d)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Total Spend</span>
             <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
           <div className="text-2xl font-bold text-white">${m.spend.toLocaleString()}</div>
-          <div className="flex items-center space-x-1 text-xs text-emerald-400 mt-2">
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>+12.4% vs prev week</span>
+          <div className="flex items-center space-x-1 text-xs text-slate-400 mt-2">
+            <span>Fixed snapshot</span>
           </div>
         </div>
 
@@ -191,7 +214,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
           </div>
           <div className="text-2xl font-bold text-white">{m.roas}x</div>
           <div className="flex items-center space-x-1 text-xs text-emerald-400 mt-2">
-            <ArrowUpRight className="w-3.5 h-3.5" />
             <span>Target &gt; 3.0x</span>
           </div>
         </div>
@@ -203,10 +225,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
               <Target className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-white">${m.cpa}</div>
-          <div className="flex items-center space-x-1 text-xs text-emerald-400 mt-2">
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>-8.2% cost per acquisition</span>
+          <div className="text-2xl font-bold text-white">
+            {m.cpa !== null ? `$${m.cpa}` : <span className="text-slate-400 font-mono">N/A</span>}
+          </div>
+          <div className="flex items-center space-x-1 text-xs text-slate-400 mt-2">
+            <span>{m.cpa !== null ? 'Cost per acquisition' : 'Zero purchases recorded'}</span>
           </div>
         </div>
 
@@ -232,7 +255,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
           </div>
           <div className="text-2xl font-bold text-white">{diagnostics.length} Active</div>
           <div className="flex items-center space-x-1 text-xs text-indigo-400 mt-2">
-            <span>Ready for Staging</span>
+            <span>Account scoped</span>
           </div>
         </div>
       </div>
@@ -244,11 +267,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-lg font-bold text-white">Spend & ROAS Velocity</h2>
-              <p className="text-xs text-slate-400">Daily performance trends over the past 7 days</p>
+              <p className="text-xs text-slate-400">Fixed snapshot performance trends</p>
             </div>
             <div className="flex items-center space-x-2 text-xs bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300">
               <BarChart3 className="w-4 h-4 text-blue-400" />
-              <span>Last 7 Days</span>
+              <span>Snapshot View</span>
             </div>
           </div>
           <div className="h-72 w-full mt-2">
@@ -282,7 +305,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
               </div>
               <div>
                 <h2 className="text-lg font-bold text-white">AI Diagnostic Engine</h2>
-                <p className="text-xs text-slate-400">Gemini-powered anomaly detection</p>
+                <p className="text-xs text-slate-400">Account-scoped Gemini analysis</p>
               </div>
             </div>
             {loadingAi && <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" />}
@@ -290,10 +313,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
 
           <div className="space-y-3 overflow-y-auto max-h-[340px] pr-1">
             {diagnostics.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-8">No active anomalies detected. Account operating smoothly.</p>
+              <p className="text-xs text-slate-400 text-center py-8">No active anomalies detected for this account.</p>
             ) : (
               diagnostics.map((diag) => {
                 const isHigh = diag.severity === 'high';
+                const isAdvisory = diag.payload?.action === 'ADVISORY' || diag.payload?.action === 'UPDATE_BUDGET';
                 return (
                   <div
                     key={diag.id}
@@ -317,13 +341,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
                     <p className="text-xs text-slate-300 mt-1">{diag.description}</p>
                     <div className="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between">
                       <span className="text-[11px] text-indigo-300 font-medium">{diag.suggested_action}</span>
-                      <button
-                        onClick={() => handleStageAiEdit(diag)}
-                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1"
-                      >
-                        <Zap className="w-3 h-3" />
-                        <span>Stage Edit</span>
-                      </button>
+                      {!isAdvisory ? (
+                        <button
+                          onClick={() => handleStageAiEdit(diag)}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow transition flex items-center space-x-1"
+                        >
+                          <Zap className="w-3 h-3" />
+                          <span>Stage Draft</span>
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 italic">Advisory</span>
+                      )}
                     </div>
                   </div>
                 );
@@ -337,14 +365,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-bold text-white">Top Active Campaigns</h2>
-            <p className="text-xs text-slate-400">Live performance metrics pulled from Meta Graph API</p>
+            <h2 className="text-lg font-bold text-white">Active Campaigns for Account</h2>
+            <p className="text-xs text-slate-400">Live performance metrics in simulation</p>
           </div>
           <button
             onClick={() => onNavigateTab('campaigns')}
             className="text-xs text-blue-400 hover:text-blue-300 font-semibold"
           >
-            Manage All Campaigns →
+            Manage Campaigns →
           </button>
         </div>
 
@@ -374,7 +402,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedAccount, o
                   <td className="py-4 px-3 text-slate-300">${cmp.daily_budget_cents / 100} /day</td>
                   <td className="py-4 px-3 text-slate-300">${cmp.spend.toLocaleString()}</td>
                   <td className="py-4 px-3 text-slate-300">{cmp.ctr}%</td>
-                  <td className="py-4 px-3 text-slate-300">${cmp.cpa}</td>
+                  <td className="py-4 px-3 text-slate-300">
+                    {cmp.cpa !== null ? `$${cmp.cpa}` : <span className="text-slate-500 font-mono">N/A</span>}
+                  </td>
                   <td className="py-4 px-3 font-bold text-emerald-400">{cmp.roas}x</td>
                   <td className="py-4 px-3 text-right">
                     <button

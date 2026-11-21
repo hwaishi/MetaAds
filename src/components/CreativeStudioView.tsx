@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, Upload, Image as ImageIcon, Video, CheckCircle2, ShieldAlert, Link, Send, RefreshCw } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Sparkles, Image as ImageIcon, Video, CheckCircle2, ShieldAlert, Link, Send, RefreshCw, Layers } from 'lucide-react';
 
 interface CreativeStudioViewProps {
   selectedAccount: string;
@@ -27,16 +27,39 @@ export const CreativeStudioView: React.FC<CreativeStudioViewProps> = ({ selected
   const [selectedImage, setSelectedImage] = useState(sampleImages[0].url);
   const [format, setFormat] = useState<'image' | 'video'>('image');
 
+  // Ad-set picker state
+  const [adSetsList, setAdSetsList] = useState<any[]>([]);
+  const [selectedAdSetId, setSelectedAdSetId] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [aiVariations, setAiVariations] = useState<any[]>([]);
   const [loadingAi, setLoadingAi] = useState(false);
   const [stagingSuccess, setStagingSuccess] = useState<string | null>(null);
+
+  // Fetch ad sets when selectedAccount changes, and clear/reset selection
+  useEffect(() => {
+    setSelectedAdSetId('');
+    fetch(`/api/adsets?account_id=${selectedAccount}`)
+      .then(res => res.json())
+      .then(data => {
+        setAdSetsList(data);
+        if (data.length > 0) {
+          setSelectedAdSetId(data[0].id);
+        }
+      })
+      .catch(err => console.error(err));
+  }, [selectedAccount]);
 
   const handleGenerateCopy = async () => {
     setLoadingAi(true);
     try {
       const res = await fetch('/api/ai/copywriting', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Demo-User': 'alex@brand.com',
+          'X-Demo-Role': 'ADMIN'
+        },
         body: JSON.stringify({ product_name: productName, audience, objective, tone })
       });
       const data = await res.json();
@@ -56,13 +79,23 @@ export const CreativeStudioView: React.FC<CreativeStudioViewProps> = ({ selected
   };
 
   const handleStageAd = async () => {
+    setErrorMessage(null);
+    if (!selectedAdSetId) {
+      setErrorMessage('Please select a valid target ad set.');
+      return;
+    }
+
     try {
       const res = await fetch('/api/creatives/stage-ad', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Demo-User': 'alex@brand.com',
+          'X-Demo-Role': 'ADMIN'
+        },
         body: JSON.stringify({
           ad_account_id: selectedAccount,
-          target_parent_id: 'as_201',
+          target_parent_id: selectedAdSetId,
           name: `Ad - ${productName} - ${format.toUpperCase()}`,
           format,
           primary_text: primaryText,
@@ -75,11 +108,13 @@ export const CreativeStudioView: React.FC<CreativeStudioViewProps> = ({ selected
         })
       });
       const data = await res.json();
-      if (data.success) {
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Failed to stage ad');
+      } else if (data.success) {
         setStagingSuccess('Ad successfully staged in Approval Queue in PAUSED draft mode!');
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Server error');
     }
   };
 
@@ -94,7 +129,7 @@ export const CreativeStudioView: React.FC<CreativeStudioViewProps> = ({ selected
             </span>
           </div>
           <h1 className="text-2xl font-bold text-white mt-1">AI Creative & Copy Studio</h1>
-          <p className="text-sm text-slate-400">Generate high-converting direct-response copy and stage ads safely into the approval queue.</p>
+          <p className="text-sm text-slate-400">Generate direct-response copy and stage ads safely into the approval queue.</p>
         </div>
       </div>
 
@@ -113,9 +148,43 @@ export const CreativeStudioView: React.FC<CreativeStudioViewProps> = ({ selected
         </div>
       )}
 
+      {errorMessage && (
+        <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 p-4 rounded-xl text-sm flex items-center justify-between">
+          <span>{errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="underline text-xs">Dismiss</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Copy Generator & Ad Form */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Ad-Set Picker & Target Selection */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
+            <div className="flex items-center space-x-2">
+              <Layers className="w-5 h-5 text-indigo-400" />
+              <h2 className="text-lg font-bold text-white">Target Ad Set Selection</h2>
+            </div>
+            <p className="text-xs text-slate-400">Select the destination ad set for this creative within the currently active account.</p>
+            <div>
+              <label className="text-xs text-slate-400 font-medium">Destination Ad Set</label>
+              <select
+                value={selectedAdSetId}
+                onChange={(e) => setSelectedAdSetId(e.target.value)}
+                className="w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              >
+                {adSetsList.length === 0 ? (
+                  <option value="">No ad sets available for this account</option>
+                ) : (
+                  adSetsList.map((as) => (
+                    <option key={as.id} value={as.id}>
+                      {as.name} ({as.id})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          </div>
+
           {/* AI Copywriting Generator Box */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
             <div className="flex items-center justify-between">
@@ -289,7 +358,7 @@ export const CreativeStudioView: React.FC<CreativeStudioViewProps> = ({ selected
         <div className="space-y-6">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg sticky top-24">
             <h2 className="text-base font-bold text-white mb-3">Live Meta Ad Preview</h2>
-            <p className="text-xs text-slate-400 mb-4">Rendered via Meta `/previews` endpoint simulation</p>
+            <p className="text-xs text-slate-400 mb-4">Rendered via Meta `/previews` simulation</p>
 
             {/* Mobile Feed Preview Mockup */}
             <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
@@ -303,7 +372,7 @@ export const CreativeStudioView: React.FC<CreativeStudioViewProps> = ({ selected
                     <span>Brand Official</span>
                     <span className="w-3 h-3 bg-blue-500 rounded-full text-[8px] flex items-center justify-center text-white">✓</span>
                   </div>
-                  <div className="text-[10px] text-slate-400">Sponsored • Paid Partnership</div>
+                  <div className="text-[10px] text-slate-400">Sponsored • Simulation</div>
                 </div>
               </div>
 

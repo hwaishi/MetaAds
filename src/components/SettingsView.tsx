@@ -12,11 +12,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ accounts, selectedAc
   const [savedMsg, setSavedMsg] = useState(false);
 
   useEffect(() => {
-    fetch('/api/audit-logs')
+    fetch(`/api/audit-logs?account_id=${selectedAccount}`, {
+      headers: { 'X-Demo-User': 'alex@brand.com', 'X-Demo-Role': 'ADMIN' }
+    })
       .then(res => res.json())
       .then(data => setAuditLogs(data))
       .catch(err => console.error(err));
-  }, []);
+  }, [selectedAccount]);
 
   const handleSaveGuardrails = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +38,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ accounts, selectedAc
             </span>
           </div>
           <h1 className="text-2xl font-bold text-white mt-1">Settings & Audit Logs</h1>
-          <p className="text-sm text-slate-400">Configure Meta Marketing API v27.0 credentials, safety spend ceilings, and view audit trail.</p>
+          <p className="text-sm text-slate-400">Configure simulation credentials, safety spend ceilings, and account-scoped audit trail.</p>
         </div>
       </div>
 
@@ -52,9 +54,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ accounts, selectedAc
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
           <div className="flex items-center space-x-2">
             <Key className="w-5 h-5 text-blue-400" />
-            <h2 className="text-lg font-bold text-white">Meta Graph & Marketing API v27.0</h2>
+            <h2 className="text-lg font-bold text-white">Meta Marketing API v27.0 (Simulation)</h2>
           </div>
-          <p className="text-xs text-slate-400">Connected to secure server-side proxy route. Access tokens are encrypted and never exposed client-side.</p>
+          <p className="text-xs text-slate-400">All ad operations are strictly simulated. No live external API calls are executed.</p>
 
           <div className="space-y-3 pt-2">
             <div>
@@ -76,11 +78,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ accounts, selectedAc
               />
             </div>
             <div>
-              <label className="text-xs text-slate-400 font-medium">API Version</label>
+              <label className="text-xs text-slate-400 font-medium">Authentication Mode</label>
               <input
                 type="text"
                 disabled
-                value="v27.0 (Graph & Marketing API)"
+                value="Demo Auth Header (Role: ADMIN / REVIEWER)"
                 className="w-full mt-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-300 text-sm"
               />
             </div>
@@ -132,9 +134,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ accounts, selectedAc
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
         <div className="flex items-center space-x-2">
           <FileText className="w-5 h-5 text-indigo-400" />
-          <h2 className="text-lg font-bold text-white">Immutable Audit Trail & API Logs</h2>
+          <h2 className="text-lg font-bold text-white">Account-Scoped Audit Trail & API Logs</h2>
         </div>
-        <p className="text-xs text-slate-400">All backend calls executed against Meta Graph API v27.0 or internal staging queue.</p>
+        <p className="text-xs text-slate-400">All simulation actions executed for account {currentAcc?.account_name}.</p>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
